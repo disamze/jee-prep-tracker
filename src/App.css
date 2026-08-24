@@ -522,6 +522,85 @@ button {
   min-width: 76px;
 }
 
+.today-plan {
+  min-width: 0;
+}
+
+.today-plan .schedule-row {
+  padding: 15px 0;
+}
+
+.active-study-clock {
+  border: 1px solid #4f46e1;
+  background: linear-gradient(135deg, #202762, #111a35);
+  border-radius: 7px;
+  padding: 15px;
+  margin: -2px 0 5px;
+}
+
+.active-study-clock span,
+.active-study-clock small {
+  display: block;
+  color: #b5baff;
+  font: 600 9px 'JetBrains Mono';
+  letter-spacing: 1px;
+}
+
+.active-study-clock strong {
+  display: block;
+  color: #fff;
+  font: 600 36px Outfit;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin: 8px 0;
+}
+
+.active-study-clock b {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.active-study-clock.idle {
+  border-color: #33435d;
+  background: linear-gradient(135deg, #172238, #111827);
+}
+
+.active-study-clock .text-link {
+  margin-top: 12px;
+}
+
+.schedule-row > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule-row p {
+  color: #c8d2e1;
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 6px 0 0;
+}
+
+.schedule-check,
+.block-check {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #526583;
+  border-radius: 5px;
+  background: #101a2d;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.schedule-check.done,
+.block-check.done {
+  background: var(--green);
+  border-color: var(--green);
+}
+
 .empty {
   color: #728198;
   font-size: 11px;
@@ -569,7 +648,7 @@ button {
 .block {
   background: #1a2440;
   border-left: 2px solid var(--indigo);
-  padding: 11px 9px;
+  padding: 13px 38px 13px 11px;
   margin-bottom: 9px;
   position: relative;
 }
@@ -587,13 +666,48 @@ button {
   margin: 7px 0;
 }
 
-.block button {
+.block-delete {
   position: absolute;
   right: 6px;
   top: 7px;
   background: none;
   border: 0;
   color: #697791;
+}
+
+.block-edit {
+  position: absolute;
+  right: 6px;
+  top: 31px;
+  background: none;
+  border: 0;
+  color: #8e9cff;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.block-check {
+  position: absolute;
+  right: 6px;
+  bottom: 7px;
+}
+
+.block.done {
+  opacity: 0.62;
+}
+
+.block.done b,
+.block.done .block-task {
+  text-decoration: line-through;
+}
+
+.block-task {
+  margin: 9px 0 0;
+  color: #c8d2e1;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .add-day {
@@ -610,6 +724,60 @@ button {
 
 .topic-list {
   max-width: 800px;
+}
+
+.subject-progress-list {
+  display: grid;
+  gap: 11px;
+  max-width: 800px;
+  margin: -2px 0 17px;
+}
+
+.subject-progress {
+  border: 1px solid #263550;
+  border-radius: 7px;
+  padding: 12px 14px;
+  background: #0e1624;
+}
+
+.subject-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.subject-progress b {
+  font-size: 12px;
+}
+
+.subject-progress span {
+  color: var(--green);
+  font: 600 10px 'JetBrains Mono';
+}
+
+.subject-progress input {
+  accent-color: var(--green);
+  cursor: pointer;
+  width: 100%;
+}
+
+.subject-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-top: 11px;
+}
+
+.subject-checklist label {
+  color: #b9c5d8;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.subject-checklist input {
+  accent-color: var(--green);
+  margin: 0 5px 0 0;
 }
 
 .topic {
@@ -799,7 +967,8 @@ button {
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   padding: 10px 11px;
   background: #0c1421;
@@ -808,6 +977,44 @@ button {
   border-radius: 5px;
   font: 12px inherit;
   outline: none;
+}
+
+.time-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 7px;
+}
+
+.focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(circle at center, #202d65, #050812 62%);
+}
+
+.focus-overlay > span {
+  color: #aeb8ff;
+  font: 600 11px 'JetBrains Mono';
+  letter-spacing: 2px;
+}
+
+.focus-overlay strong {
+  font: 600 clamp(72px, 17vw, 170px) Outfit;
+  line-height: 1;
+  margin: 18px 0;
+}
+
+.focus-overlay p {
+  max-width: 360px;
+  color: #b5c0d3;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 26px;
 }
 
 .field input:focus,
