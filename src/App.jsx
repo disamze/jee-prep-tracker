@@ -56,9 +56,10 @@ const formatTime = (time) => {
 
 const formatCountdown = (seconds) => {
   const safeSeconds = Math.max(0, seconds);
-  const minutes = Math.floor(safeSeconds / 60);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
   const remainingSeconds = safeSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
 // ===============================
@@ -1156,6 +1157,7 @@ function Overview({
           {activeStudyBlock && (
             <div className="active-study-clock">
               <span>STUDY BLOCK LIVE</span>
+              <em>ENDS IN</em>
               <strong>
                 {formatCountdown(activeStudySecondsLeft)}
               </strong>
@@ -1178,11 +1180,13 @@ function Overview({
               </strong>
               <b>No study block is running right now.</b>
               <small>Your countdown appears here automatically at the next slot.</small>
-              <button className="text-link" onClick={() => setModal("focus")}>
-                Start a focus timer <ChevronRight size={14} />
-              </button>
             </div>
           )}
+
+          <button className="primary focus-start" onClick={() => setModal("focus")}>
+            <Clock3 size={15} />
+            Start dedicated focus mode
+          </button>
 
           {data.timetable
             .filter(
@@ -1423,7 +1427,7 @@ function Timetable({
                       title="Edit study block"
                       aria-label="Edit study block"
                     >
-                      <Pencil size={13} /> Edit
+                      <Pencil size={13} /> Edit block
                     </button>
 
                     <button

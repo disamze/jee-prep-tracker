@@ -524,6 +524,8 @@ button {
 
 .today-plan {
   min-width: 0;
+  grid-column: 1 / -1;
+  grid-row: 1;
 }
 
 .today-plan .schedule-row {
@@ -534,22 +536,29 @@ button {
   border: 1px solid #4f46e1;
   background: linear-gradient(135deg, #202762, #111a35);
   border-radius: 7px;
-  padding: 15px;
-  margin: -2px 0 5px;
+  padding: 21px 24px;
+  margin: -2px 0 14px;
 }
 
 .active-study-clock span,
-.active-study-clock small {
+.active-study-clock small,
+.active-study-clock em {
   display: block;
   color: #b5baff;
   font: 600 9px 'JetBrains Mono';
   letter-spacing: 1px;
 }
 
+.active-study-clock em {
+  color: var(--green);
+  font-style: normal;
+  margin-top: 12px;
+}
+
 .active-study-clock strong {
   display: block;
   color: #fff;
-  font: 600 36px Outfit;
+  font: 600 clamp(56px, 8vw, 106px) Outfit;
   letter-spacing: -1px;
   line-height: 1;
   margin: 8px 0;
@@ -566,8 +575,8 @@ button {
   background: linear-gradient(135deg, #172238, #111827);
 }
 
-.active-study-clock .text-link {
-  margin-top: 12px;
+.focus-start {
+  margin: 0 0 8px;
 }
 
 .schedule-row > div {
@@ -676,12 +685,16 @@ button {
 }
 
 .block-edit {
-  position: absolute;
-  right: 6px;
-  top: 31px;
-  background: none;
-  border: 0;
-  color: #8e9cff;
+  position: relative;
+  right: auto;
+  top: auto;
+  width: 100%;
+  margin-top: 12px;
+  padding: 7px 8px;
+  background: #202957;
+  border: 1px solid #4e5ec3;
+  border-radius: 4px;
+  color: #d4d9ff;
   font-size: 10px;
   display: inline-flex;
   align-items: center;
