@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import axios from "axios";
 
@@ -23,11 +23,42 @@ import {
 // BACKEND CONFIGURATION
 // ===============================
 
-// For Vite projects use VITE_BACKEND_URL
-const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
-
+// VITE_BACKEND_URL may be set to either the server root or its /api endpoint.
+// The deployed tracker backend is used by default, while browser storage remains
+// available as a fallback if the server is temporarily unavailable.
+const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL ||
+  "https://jee-prep-tracker-tqdf.onrender.com"
+).replace(/\/api\/?$/, "");
 const API = `${BACKEND_URL}/api`;
+const LOCAL_STORAGE_KEY = "jee-apex-tracker-data";
+
+const timeToMinutes = (time) => {
+  const [hours, minutes] = (time || "").split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  return (hours * 60) + minutes;
+};
+
+const formatTime = (time) => {
+  const [hours, minutes] = (time || "").split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return "Flexible";
+
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(2000, 0, 1, hours, minutes));
+};
+
+const formatCurrentTime = (date) =>
+  new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
 
 // ===============================
 // EMPTY DATA
@@ -41,6 +72,19 @@ const empty = {
   errors: [],
   extras: [],
   archives: [],
+};
+
+const readLocalData = () => {
+  try {
+    const saved = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+    return saved ? { ...empty, ...JSON.parse(saved) } : empty;
+  } catch {
+    return empty;
+  }
+};
+
+const saveLocalData = (nextData) => {
+  window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
 };
 
 // ===============================
@@ -100,34 +144,59 @@ function App() {
   const [modal, setModal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [isOffline, setIsOffline] = useState(!BACKEND_URL);
+  const alarmContext = useRef(null);
 
   // ===============================
   // LOAD DASHBOARD
   // ===============================
 
   const load = async () => {
+    if (!BACKEND_URL) {
+      setData(readLocalData());
+      setNotice("Offline mode: changes are saved in this browser.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await axios.get(`${API}/dashboard`);
 
-      setData({
+      const nextData = {
         ...empty,
         ...response.data,
-      });
+      };
+
+      setData(nextData);
+      saveLocalData(nextData);
+      setIsOffline(false);
 
       setNotice("");
     } catch (error) {
-      console.error("Dashboard error:", error);
-
-      setNotice(
-        "Could not reach your backend. Make sure FastAPI is running."
-      );
+      console.warn("Dashboard is offline; using browser storage.", error);
+      setData(readLocalData());
+      setIsOffline(true);
+      setNotice("Offline mode: changes are saved in this browser.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
+    const initialLoad = window.setTimeout(() => {
+      load();
+    }, 0);
+
+    return () => window.clearTimeout(initialLoad);
+  }, []);
+
+  useEffect(() => {
+    const clock = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(clock);
   }, []);
 
   // ===============================
@@ -151,14 +220,17 @@ function App() {
   // SYLLABUS PROGRESS
   // ===============================
 
-  const syllabusDone =
-    data.syllabus?.filter((item) => item.completed).length || 0;
-
   const syllabusTotal = data.syllabus?.length || 0;
 
   const syllabusPct =
     syllabusTotal > 0
-      ? Math.round((syllabusDone / syllabusTotal) * 100)
+      ? Math.round(
+          data.syllabus.reduce(
+            (total, item) => total + (Number.isFinite(Number(item.progress))
+              ? Number(item.progress) : item.completed ? 100 : 0),
+            0
+          ) / syllabusTotal
+        )
       : 0;
 
   // ===============================
@@ -175,11 +247,125 @@ function App() {
         item.date < today
     ) || [];
 
+  const todayName = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+  });
+
+  const incompleteTodayBlocks = data.timetable?.filter(
+    (item) => item.day === todayName && !item.completed
+  ) || [];
+
+  const currentMinutes = (currentTime.getHours() * 60) + currentTime.getMinutes();
+  const activeStudyBlock = data.timetable?.find((item) => {
+    const start = timeToMinutes(item.start);
+    const end = timeToMinutes(item.end);
+
+    return item.day === todayName && !item.completed && start !== null &&
+      end !== null && currentMinutes >= start && currentMinutes < end;
+  });
+
+  // ===============================
+  // STUDY BREAK REMINDERS
+  // ===============================
+
+  const prepareAlarm = () => {
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext;
+
+    if (!AudioContextClass) return null;
+
+    if (!alarmContext.current) {
+      alarmContext.current = new AudioContextClass();
+    }
+
+    if (alarmContext.current.state === "suspended") {
+      alarmContext.current.resume();
+    }
+
+    return alarmContext.current;
+  };
+
+  useEffect(() => {
+    const playAlarm = () => {
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+
+      if (!AudioContextClass) return;
+
+      if (!alarmContext.current) {
+        alarmContext.current = new AudioContextClass();
+      }
+
+      const context = alarmContext.current;
+
+      if (context.state === "suspended") {
+        context.resume();
+      }
+
+      [0, 0.22, 0.44].forEach((delay) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const startAt = context.currentTime + delay;
+
+        oscillator.type = "square";
+        oscillator.frequency.setValueAtTime(880, startAt);
+        gain.gain.setValueAtTime(0.28, startAt);
+        gain.gain.exponentialRampToValueAtTime(0.01, startAt + 0.16);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(startAt);
+        oscillator.stop(startAt + 0.17);
+      });
+    };
+
+    const timers = data.timetable
+      .filter((item) => item.day === todayName && !item.completed)
+      .filter((item) => item.end)
+      .map((item) => {
+        const [hours, minutes] = item.end.split(":").map(Number);
+        const reminderTime = new Date();
+
+        reminderTime.setHours(hours, minutes, 0, 0);
+
+        if (Number.isNaN(hours) || Number.isNaN(minutes) || reminderTime <= new Date()) {
+          return null;
+        }
+
+        return window.setTimeout(() => {
+          playAlarm();
+
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("Break over — back to study", {
+              body: `${item.title || "Your study block"} is ready for your next session.`,
+            });
+          }
+        }, reminderTime.getTime() - Date.now());
+      })
+      .filter(Boolean);
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [data.timetable, todayName]);
+
   // ===============================
   // UPDATE ITEM
   // ===============================
 
   const mutate = async (collection, id, changes) => {
+    if (isOffline) {
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: current[collection].map((item) =>
+            item.id === id ? { ...item, ...changes } : item
+          ),
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setNotice("Saved in this browser.");
+      return;
+    }
+
     try {
       await axios.patch(
         `${API}/${collection}/${id}`,
@@ -188,9 +374,19 @@ function App() {
 
       await load();
     } catch (error) {
-      console.error(error);
-
-      setNotice("Could not update the item.");
+      console.warn("Update failed; saving in browser instead.", error);
+      setIsOffline(true);
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: current[collection].map((item) =>
+            item.id === id ? { ...item, ...changes } : item
+          ),
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setNotice("Offline mode: update saved in this browser.");
     }
   };
 
@@ -199,6 +395,19 @@ function App() {
   // ===============================
 
   const remove = async (collection, id) => {
+    if (isOffline) {
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: current[collection].filter((item) => item.id !== id),
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setNotice("Saved in this browser.");
+      return;
+    }
+
     try {
       await axios.delete(
         `${API}/${collection}/${id}`
@@ -206,9 +415,17 @@ function App() {
 
       await load();
     } catch (error) {
-      console.error(error);
-
-      setNotice("Could not delete the item.");
+      console.warn("Delete failed; saving in browser instead.", error);
+      setIsOffline(true);
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: current[collection].filter((item) => item.id !== id),
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setNotice("Offline mode: deletion saved in this browser.");
     }
   };
 
@@ -217,15 +434,40 @@ function App() {
   // ===============================
 
   const add = async (collection, payload) => {
-    try {
-      const body =
-        collection === "exams"
-          ? payload
-          : {
-              ...payload,
-              exam_id: activeExam?.id || "",
-            };
+    const body =
+      collection === "exams"
+        ? payload
+        : {
+            ...payload,
+            exam_id: activeExam?.id || "",
+          };
 
+    const saveNewItemLocally = () => {
+      const item = {
+        id: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+        completed: false,
+        archived: false,
+        ...body,
+      };
+
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: [item, ...current[collection]],
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setModal(null);
+      setNotice("Saved in this browser.");
+    };
+
+    if (isOffline) {
+      saveNewItemLocally();
+      return;
+    }
+
+    try {
       await axios.post(
         `${API}/${collection}`,
         body
@@ -237,9 +479,9 @@ function App() {
 
       setNotice("Saved successfully.");
     } catch (error) {
-      console.error(error);
-
-      setNotice("Could not save the item.");
+      console.warn("Save failed; saving in browser instead.", error);
+      setIsOffline(true);
+      saveNewItemLocally();
     }
   };
 
@@ -248,11 +490,13 @@ function App() {
   // ===============================
 
   const notify = () => {
+    prepareAlarm();
+
     if ("Notification" in window) {
       Notification.requestPermission().then(
         (permission) => {
           if (permission === "granted") {
-            setNotice("Browser reminders are enabled.");
+            setNotice("Browser reminders and break-over alarms are enabled.");
           } else {
             setNotice("Notification permission was not granted.");
           }
@@ -475,6 +719,9 @@ function App() {
             syllabusPct={syllabusPct}
             data={data}
             overdue={overdue}
+            incompleteTodayBlocks={incompleteTodayBlocks}
+            activeStudyBlock={activeStudyBlock}
+            currentTime={currentTime}
             setTab={setTab}
             setModal={setModal}
             mutate={mutate}
@@ -485,6 +732,7 @@ function App() {
           <Timetable
             items={data.timetable || []}
             setModal={setModal}
+            mutate={mutate}
             remove={remove}
           />
         )}
@@ -496,6 +744,54 @@ function App() {
             syllabusPct={syllabusPct}
             setModal={setModal}
             mutate={mutate}
+            mutateSubjectProgress={async (subject, progress) => {
+              const matchingItems = data.syllabus.filter(
+                (item) => (item.subject || "General") === subject
+              );
+
+              if (isOffline) {
+                setData((current) => {
+                  const nextData = {
+                    ...current,
+                    syllabus: current.syllabus.map((item) =>
+                      (item.subject || "General") === subject
+                        ? { ...item, progress, completed: progress === 100 }
+                        : item
+                    ),
+                  };
+                  saveLocalData(nextData);
+                  return nextData;
+                });
+                setNotice("Saved in this browser.");
+                return;
+              }
+
+              try {
+                await Promise.all(matchingItems.map((item) =>
+                  axios.patch(`${API}/syllabus/${item.id}`, {
+                    progress,
+                    completed: progress === 100,
+                  })
+                ));
+                await load();
+              } catch (error) {
+                console.warn("Progress update failed; saving in browser instead.", error);
+                setIsOffline(true);
+                setData((current) => {
+                  const nextData = {
+                    ...current,
+                    syllabus: current.syllabus.map((item) =>
+                      (item.subject || "General") === subject
+                        ? { ...item, progress, completed: progress === 100 }
+                        : item
+                    ),
+                  };
+                  saveLocalData(nextData);
+                  return nextData;
+                });
+                setNotice("Offline mode: progress saved in this browser.");
+              }
+            }}
             remove={remove}
           />
         )}
@@ -540,6 +836,9 @@ function Overview({
   syllabusPct,
   data,
   overdue,
+  incompleteTodayBlocks,
+  activeStudyBlock,
+  currentTime,
   setTab,
   setModal,
   mutate,
@@ -550,6 +849,14 @@ function Overview({
       weekday: "long",
     }
   );
+
+  const backlog = [
+    ...overdue.map((item) => ({ ...item, collection: "tasks" })),
+    ...incompleteTodayBlocks.map((item) => ({
+      ...item,
+      collection: "timetable",
+    })),
+  ];
 
   return (
     <div className="content">
@@ -639,10 +946,7 @@ function Overview({
           </div>
 
           <p>
-            {data.syllabus.filter(
-              (item) => item.completed
-            ).length}{" "}
-            of {data.syllabus.length} topics locked in
+            Track each subject as you complete it, one topic at a time.
           </p>
 
           <button
@@ -697,7 +1001,7 @@ function Overview({
           title="Backlog alert"
           icon={CircleAlert}
           className={
-            overdue.length
+            backlog.length
               ? "alert-panel"
               : ""
           }
@@ -706,17 +1010,17 @@ function Overview({
           <div className="metric-row">
 
             <strong>
-              {overdue.length}
+              {backlog.length}
             </strong>
 
             <span>
-              tasks need a second look
+              incomplete tasks need a second look
             </span>
 
           </div>
 
-          {overdue.length > 0 ? (
-            overdue
+          {backlog.length > 0 ? (
+            backlog
               .slice(0, 3)
               .map((item) => (
 
@@ -734,9 +1038,7 @@ function Overview({
                     </b>
 
                     <small>
-                      {item.subject ||
-                        "General"}{" "}
-                      · {item.date}
+                      {item.subject || "General"} · {item.notes || item.date || "Needs attention"}
                     </small>
 
                   </div>
@@ -744,7 +1046,7 @@ function Overview({
                   <button
                     onClick={() =>
                       mutate(
-                        "tasks",
+                        item.collection,
                         item.id,
                         {
                           completed: true,
@@ -768,10 +1070,18 @@ function Overview({
 
         {/* TODAY PLAN */}
 
-        <Card
-          title="Today's plan"
-          icon={Clock3}
-        >
+        <Card title="Today's plan" icon={Clock3} className="today-plan">
+
+          {activeStudyBlock && (
+            <div className="active-study-clock">
+              <span>STUDY BLOCK LIVE</span>
+              <strong>{formatCurrentTime(currentTime)}</strong>
+              <b>{activeStudyBlock.title}</b>
+              <small>
+                {formatTime(activeStudyBlock.start)} — {formatTime(activeStudyBlock.end)}
+              </small>
+            </div>
+          )}
 
           {data.timetable
             .filter(
@@ -787,11 +1097,10 @@ function Overview({
               >
 
                 <span>
-                  {item.start ||
-                    "Flexible"}
+                  {item.start ? formatTime(item.start) : "Flexible"}
 
                   {item.end &&
-                    ` — ${item.end}`}
+                    ` — ${formatTime(item.end)}`}
                 </span>
 
                 <div>
@@ -805,13 +1114,25 @@ function Overview({
                       "Study block"}
                   </small>
 
+                  {item.notes && <p>{item.notes}</p>}
+
                 </div>
+
+                <button
+                  className={`schedule-check ${item.completed ? "done" : ""}`}
+                  onClick={() => mutate("timetable", item.id, {
+                    completed: !item.completed,
+                  })}
+                  aria-label={item.completed ? "Mark task incomplete" : "Mark task complete"}
+                >
+                  {item.completed && <Check size={14} />}
+                </button>
 
               </div>
 
             ))}
 
-          {!data.timetable.length && (
+          {!data.timetable.some((item) => item.day === todayName) && (
             <div className="empty">
               Your week is waiting for a plan.
             </div>
@@ -892,6 +1213,7 @@ function Overview({
 function Timetable({
   items,
   setModal,
+  mutate,
   remove,
 }) {
   const days = [
@@ -958,17 +1280,16 @@ function Timetable({
                 (item) => (
 
                   <div
-                    className="block"
+                    className={`block ${item.completed ? "done" : ""}`}
                     key={item.id}
                   >
 
                     <small>
 
-                      {item.start ||
-                        "Flexible"}
+                      {item.start ? formatTime(item.start) : "Flexible"}
 
                       {item.end &&
-                        ` – ${item.end}`}
+                        ` – ${formatTime(item.end)}`}
 
                     </small>
 
@@ -981,7 +1302,21 @@ function Timetable({
                         "Open study"}
                     </span>
 
+                    {item.notes && <p className="block-task">{item.notes}</p>}
+
                     <button
+                      className={`block-check ${item.completed ? "done" : ""}`}
+                      onClick={() => mutate("timetable", item.id, {
+                        completed: !item.completed,
+                      })}
+                      title={item.completed ? "Mark task incomplete" : "Mark task complete"}
+                      aria-label={item.completed ? "Mark task incomplete" : "Mark task complete"}
+                    >
+                      {item.completed && <Check size={13} />}
+                    </button>
+
+                    <button
+                      className="block-delete"
                       onClick={() =>
                         remove(
                           "timetable",
@@ -1028,8 +1363,16 @@ function Syllabus({
   syllabusPct,
   setModal,
   mutate,
+  mutateSubjectProgress,
   remove,
 }) {
+  const subjects = Object.values(syllabus.reduce((groups, item) => {
+    const name = item.subject || "General";
+    if (!groups[name]) groups[name] = { name, items: [] };
+    groups[name].items.push(item);
+    return groups;
+  }, {}));
+
   return (
     <div className="content">
 
@@ -1082,6 +1425,29 @@ function Syllabus({
         icon={BookOpen}
       >
 
+        <div className="subject-progress-list">
+          {subjects.map(({ name, items }) => {
+            const progress = Math.round(items.reduce(
+              (total, item) => total + (Number.isFinite(Number(item.progress))
+                ? Number(item.progress) : item.completed ? 100 : 0), 0
+            ) / items.length);
+
+            return (
+              <div className="subject-progress" key={name}>
+                <div><b>{name}</b><span>{progress}% complete</span></div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={progress}
+                  onChange={(event) => mutateSubjectProgress(name, Number(event.target.value))}
+                  aria-label={`${name} progress`}
+                />
+              </div>
+            );
+          })}
+        </div>
+
         <div className="topic-list">
 
           {syllabus.map(
@@ -1105,6 +1471,7 @@ function Syllabus({
                       {
                         completed:
                           !item.completed,
+                        progress: item.completed ? 0 : 100,
                       }
                     )
                   }
@@ -1390,7 +1757,7 @@ function Modal({
     task: [
       "Add a task",
       "tasks",
-      ["title", "subject", "date"],
+      ["title", "subject", "date", "notes"],
     ],
 
     timetable: [
@@ -1482,7 +1849,9 @@ function Modal({
         {fields.map((field) => {
 
           const label =
-            field
+            field === "notes" && type === "timetable"
+              ? "Task details"
+              : field
               .replaceAll("_", " ")
               .replace(
                 /\b\w/g,

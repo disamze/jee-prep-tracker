@@ -122,6 +122,8 @@ class Item(BaseModel):
 
     kind: str = ""
 
+    progress: int = Field(default=0, ge=0, le=100)
+
     completed: bool = False
     archived: bool = False
     reminder: bool = False
