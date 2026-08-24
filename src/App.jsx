@@ -53,13 +53,6 @@ const formatTime = (time) => {
   }).format(new Date(2000, 0, 1, hours, minutes));
 };
 
-const formatCurrentTime = (date) =>
-  new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-
 // ===============================
 // EMPTY DATA
 // ===============================
@@ -1075,7 +1068,13 @@ function Overview({
           {activeStudyBlock && (
             <div className="active-study-clock">
               <span>STUDY BLOCK LIVE</span>
-              <strong>{formatCurrentTime(currentTime)}</strong>
+              <strong>
+                {currentTime.toLocaleTimeString("en-IN", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </strong>
               <b>{activeStudyBlock.title}</b>
               <small>
                 {formatTime(activeStudyBlock.start)} — {formatTime(activeStudyBlock.end)}
