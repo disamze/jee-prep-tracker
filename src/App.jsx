@@ -23,11 +23,42 @@ import {
 // BACKEND CONFIGURATION
 // ===============================
 
-// For Vite projects use VITE_BACKEND_URL
-const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
-
+// VITE_BACKEND_URL may be set to either the server root or its /api endpoint.
+// The deployed tracker backend is used by default, while browser storage remains
+// available as a fallback if the server is temporarily unavailable.
+const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL ||
+  "https://jee-prep-tracker-tqdf.onrender.com"
+).replace(/\/api\/?$/, "");
 const API = `${BACKEND_URL}/api`;
+const LOCAL_STORAGE_KEY = "jee-apex-tracker-data";
+
+const timeToMinutes = (time) => {
+  const [hours, minutes] = (time || "").split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  return (hours * 60) + minutes;
+};
+
+const formatTime = (time) => {
+  const [hours, minutes] = (time || "").split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return "Flexible";
+
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(2000, 0, 1, hours, minutes));
+};
+
+const formatCurrentTime = (date) =>
+  new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
 
 const timeToMinutes = (time) => {
   const [hours, minutes] = (time || "").split(":").map(Number);
@@ -68,6 +99,19 @@ const empty = {
   errors: [],
   extras: [],
   archives: [],
+};
+
+const readLocalData = () => {
+  try {
+    const saved = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+    return saved ? { ...empty, ...JSON.parse(saved) } : empty;
+  } catch {
+    return empty;
+  }
+};
+
+const saveLocalData = (nextData) => {
+  window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
 };
 
 // ===============================
@@ -128,6 +172,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [isOffline, setIsOffline] = useState(!BACKEND_URL);
   const alarmContext = useRef(null);
 
   // ===============================
@@ -135,21 +180,31 @@ function App() {
   // ===============================
 
   const load = async () => {
+    if (!BACKEND_URL) {
+      setData(readLocalData());
+      setNotice("Offline mode: changes are saved in this browser.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await axios.get(`${API}/dashboard`);
 
-      setData({
+      const nextData = {
         ...empty,
         ...response.data,
-      });
+      };
+
+      setData(nextData);
+      saveLocalData(nextData);
+      setIsOffline(false);
 
       setNotice("");
     } catch (error) {
-      console.error("Dashboard error:", error);
-
-      setNotice(
-        "Could not reach your backend. Make sure FastAPI is running."
-      );
+      console.warn("Dashboard is offline; using browser storage.", error);
+      setData(readLocalData());
+      setIsOffline(true);
+      setNotice("Offline mode: changes are saved in this browser.");
     } finally {
       setLoading(false);
     }
@@ -323,6 +378,21 @@ function App() {
   // ===============================
 
   const mutate = async (collection, id, changes) => {
+    if (isOffline) {
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: current[collection].map((item) =>
+            item.id === id ? { ...item, ...changes } : item
+          ),
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setNotice("Saved in this browser.");
+      return;
+    }
+
     try {
       await axios.patch(
         `${API}/${collection}/${id}`,
@@ -331,9 +401,19 @@ function App() {
 
       await load();
     } catch (error) {
-      console.error(error);
-
-      setNotice("Could not update the item.");
+      console.warn("Update failed; saving in browser instead.", error);
+      setIsOffline(true);
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: current[collection].map((item) =>
+            item.id === id ? { ...item, ...changes } : item
+          ),
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setNotice("Offline mode: update saved in this browser.");
     }
   };
 
@@ -342,6 +422,19 @@ function App() {
   // ===============================
 
   const remove = async (collection, id) => {
+    if (isOffline) {
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: current[collection].filter((item) => item.id !== id),
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setNotice("Saved in this browser.");
+      return;
+    }
+
     try {
       await axios.delete(
         `${API}/${collection}/${id}`
@@ -349,9 +442,17 @@ function App() {
 
       await load();
     } catch (error) {
-      console.error(error);
-
-      setNotice("Could not delete the item.");
+      console.warn("Delete failed; saving in browser instead.", error);
+      setIsOffline(true);
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: current[collection].filter((item) => item.id !== id),
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setNotice("Offline mode: deletion saved in this browser.");
     }
   };
 
@@ -360,15 +461,40 @@ function App() {
   // ===============================
 
   const add = async (collection, payload) => {
-    try {
-      const body =
-        collection === "exams"
-          ? payload
-          : {
-              ...payload,
-              exam_id: activeExam?.id || "",
-            };
+    const body =
+      collection === "exams"
+        ? payload
+        : {
+            ...payload,
+            exam_id: activeExam?.id || "",
+          };
 
+    const saveNewItemLocally = () => {
+      const item = {
+        id: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+        completed: false,
+        archived: false,
+        ...body,
+      };
+
+      setData((current) => {
+        const nextData = {
+          ...current,
+          [collection]: [item, ...current[collection]],
+        };
+        saveLocalData(nextData);
+        return nextData;
+      });
+      setModal(null);
+      setNotice("Saved in this browser.");
+    };
+
+    if (isOffline) {
+      saveNewItemLocally();
+      return;
+    }
+
+    try {
       await axios.post(
         `${API}/${collection}`,
         body
@@ -380,9 +506,9 @@ function App() {
 
       setNotice("Saved successfully.");
     } catch (error) {
-      console.error(error);
-
-      setNotice("Could not save the item.");
+      console.warn("Save failed; saving in browser instead.", error);
+      setIsOffline(true);
+      saveNewItemLocally();
     }
   };
 
@@ -649,6 +775,24 @@ function App() {
               const matchingItems = data.syllabus.filter(
                 (item) => (item.subject || "General") === subject
               );
+
+              if (isOffline) {
+                setData((current) => {
+                  const nextData = {
+                    ...current,
+                    syllabus: current.syllabus.map((item) =>
+                      (item.subject || "General") === subject
+                        ? { ...item, progress, completed: progress === 100 }
+                        : item
+                    ),
+                  };
+                  saveLocalData(nextData);
+                  return nextData;
+                });
+                setNotice("Saved in this browser.");
+                return;
+              }
+
               try {
                 await Promise.all(matchingItems.map((item) =>
                   axios.patch(`${API}/syllabus/${item.id}`, {
@@ -658,8 +802,21 @@ function App() {
                 ));
                 await load();
               } catch (error) {
-                console.error(error);
-                setNotice("Could not update subject progress.");
+                console.warn("Progress update failed; saving in browser instead.", error);
+                setIsOffline(true);
+                setData((current) => {
+                  const nextData = {
+                    ...current,
+                    syllabus: current.syllabus.map((item) =>
+                      (item.subject || "General") === subject
+                        ? { ...item, progress, completed: progress === 100 }
+                        : item
+                    ),
+                  };
+                  saveLocalData(nextData);
+                  return nextData;
+                });
+                setNotice("Offline mode: progress saved in this browser.");
               }
             }}
             remove={remove}
