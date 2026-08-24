@@ -60,6 +60,33 @@ const formatCurrentTime = (date) =>
     hour12: true,
   }).format(date);
 
+const timeToMinutes = (time) => {
+  const [hours, minutes] = (time || "").split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  return (hours * 60) + minutes;
+};
+
+const formatTime = (time) => {
+  const [hours, minutes] = (time || "").split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return "Flexible";
+
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(2000, 0, 1, hours, minutes));
+};
+
+const formatCurrentTime = (date) =>
+  new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+
 // ===============================
 // EMPTY DATA
 // ===============================
