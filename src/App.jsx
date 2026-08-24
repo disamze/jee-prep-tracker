@@ -782,6 +782,7 @@ function App() {
             incompleteTodayBlocks={incompleteTodayBlocks}
             activeStudyBlock={activeStudyBlock}
             activeStudySecondsLeft={activeStudySecondsLeft}
+            currentTime={currentTime}
             setTab={setTab}
             setModal={setModal}
             mutate={mutate}
@@ -918,6 +919,7 @@ function Overview({
   incompleteTodayBlocks,
   activeStudyBlock,
   activeStudySecondsLeft,
+  currentTime,
   setTab,
   setModal,
   mutate,
@@ -1164,6 +1166,24 @@ function Overview({
             </div>
           )}
 
+          {!activeStudyBlock && (
+            <div className="active-study-clock idle">
+              <span>STUDY CLOCK</span>
+              <strong>
+                {currentTime.toLocaleTimeString("en-IN", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </strong>
+              <b>No study block is running right now.</b>
+              <small>Your countdown appears here automatically at the next slot.</small>
+              <button className="text-link" onClick={() => setModal("focus")}>
+                Start a focus timer <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+
           {data.timetable
             .filter(
               (item) =>
@@ -1403,7 +1423,7 @@ function Timetable({
                       title="Edit study block"
                       aria-label="Edit study block"
                     >
-                      <Pencil size={13} />
+                      <Pencil size={13} /> Edit
                     </button>
 
                     <button
