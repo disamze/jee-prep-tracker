@@ -11,6 +11,7 @@ import {
   CircleAlert,
   Clock3,
   History,
+  Pencil,
   Plus,
   RotateCcw,
   Target,
@@ -53,39 +54,12 @@ const formatTime = (time) => {
   }).format(new Date(2000, 0, 1, hours, minutes));
 };
 
-const formatCurrentTime = (date) =>
-  new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-
-const timeToMinutes = (time) => {
-  const [hours, minutes] = (time || "").split(":").map(Number);
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-
-  return (hours * 60) + minutes;
+const formatCountdown = (seconds) => {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 };
-
-const formatTime = (time) => {
-  const [hours, minutes] = (time || "").split(":").map(Number);
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return "Flexible";
-
-  return new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date(2000, 0, 1, hours, minutes));
-};
-
-const formatCurrentTime = (date) =>
-  new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
 
 // ===============================
 // EMPTY DATA
@@ -161,6 +135,36 @@ const Field = ({ label, ...props }) => {
   );
 };
 
+const TimeField = ({ name, label, value = "" }) => {
+  const [savedHour, savedMinute] = value.split(":").map(Number);
+  const period = savedHour >= 12 ? "PM" : "AM";
+  const hour = savedHour % 12 || 12;
+
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <div className="time-picker">
+        <select name={`${name}_hour`} defaultValue={value ? String(hour) : ""}>
+          <option value="">Hour</option>
+          {Array.from({ length: 12 }, (_, index) => index + 1).map((item) =>
+            <option key={item} value={item}>{item}</option>
+          )}
+        </select>
+        <select name={`${name}_minute`} defaultValue={value ? String(savedMinute).padStart(2, "0") : ""}>
+          <option value="">Min</option>
+          {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0")).map((item) =>
+            <option key={item} value={item}>{item}</option>
+          )}
+        </select>
+        <select name={`${name}_period`} defaultValue={value ? period : "AM"}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </label>
+  );
+};
+
 // ===============================
 // MAIN APP
 // ===============================
@@ -173,6 +177,8 @@ function App() {
   const [notice, setNotice] = useState("");
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [isOffline, setIsOffline] = useState(!BACKEND_URL);
+  const [editingBlock, setEditingBlock] = useState(null);
+  const [focusEndsAt, setFocusEndsAt] = useState(null);
   const alarmContext = useRef(null);
 
   // ===============================
@@ -290,6 +296,25 @@ function App() {
     return item.day === todayName && !item.completed && start !== null &&
       end !== null && currentMinutes >= start && currentMinutes < end;
   });
+  const activeStudyEnd = activeStudyBlock ? timeToMinutes(activeStudyBlock.end) : null;
+  const activeStudySecondsLeft = activeStudyEnd === null
+    ? 0
+    : Math.max(0, (activeStudyEnd * 60) - (currentTime.getHours() * 3600) -
+      (currentTime.getMinutes() * 60) - currentTime.getSeconds());
+  const focusSecondsLeft = focusEndsAt
+    ? Math.max(0, Math.ceil((focusEndsAt - currentTime.getTime()) / 1000))
+    : 0;
+
+  const startFocus = (minutes) => {
+    setFocusEndsAt(Date.now() + (minutes * 60 * 1000));
+    document.documentElement.requestFullscreen?.();
+    setModal(null);
+  };
+
+  const endFocus = () => {
+    setFocusEndsAt(null);
+    if (document.fullscreenElement) document.exitFullscreen?.();
+  };
 
   // ===============================
   // STUDY BREAK REMINDERS
@@ -705,6 +730,14 @@ function App() {
             </button>
 
             <button
+              className="outline"
+              onClick={() => setModal("focus")}
+            >
+              <Clock3 size={15} />
+              Focus timer
+            </button>
+
+            <button
               className="primary"
               onClick={() => setModal("exam")}
               data-testid="add-exam-button"
@@ -748,7 +781,7 @@ function App() {
             overdue={overdue}
             incompleteTodayBlocks={incompleteTodayBlocks}
             activeStudyBlock={activeStudyBlock}
-            currentTime={currentTime}
+            activeStudySecondsLeft={activeStudySecondsLeft}
             setTab={setTab}
             setModal={setModal}
             mutate={mutate}
@@ -759,6 +792,10 @@ function App() {
           <Timetable
             items={data.timetable || []}
             setModal={setModal}
+            editBlock={(item) => {
+              setEditingBlock(item);
+              setModal("timetable");
+            }}
             mutate={mutate}
             remove={remove}
           />
@@ -843,8 +880,23 @@ function App() {
           <Modal
             type={modal}
             add={add}
-            close={() => setModal(null)}
+            editItem={modal === "timetable" ? editingBlock : null}
+            update={mutate}
+            startFocus={startFocus}
+            close={() => {
+              setModal(null);
+              setEditingBlock(null);
+            }}
           />
+        )}
+
+        {focusEndsAt && (
+          <div className="focus-overlay" role="dialog" aria-modal="true">
+            <span>FOCUS MODE</span>
+            <strong>{formatCountdown(focusSecondsLeft)}</strong>
+            <p>Stay with this one study session. Everything else in the tracker is paused.</p>
+            <button className="outline" onClick={endFocus}>End focus session</button>
+          </div>
         )}
 
       </main>
@@ -865,7 +917,7 @@ function Overview({
   overdue,
   incompleteTodayBlocks,
   activeStudyBlock,
-  currentTime,
+  activeStudySecondsLeft,
   setTab,
   setModal,
   mutate,
@@ -1102,10 +1154,12 @@ function Overview({
           {activeStudyBlock && (
             <div className="active-study-clock">
               <span>STUDY BLOCK LIVE</span>
-              <strong>{formatCurrentTime(currentTime)}</strong>
+              <strong>
+                {formatCountdown(activeStudySecondsLeft)}
+              </strong>
               <b>{activeStudyBlock.title}</b>
               <small>
-                {formatTime(activeStudyBlock.start)} — {formatTime(activeStudyBlock.end)}
+                Ends at {formatTime(activeStudyBlock.end)}
               </small>
             </div>
           )}
@@ -1240,6 +1294,7 @@ function Overview({
 function Timetable({
   items,
   setModal,
+  editBlock,
   mutate,
   remove,
 }) {
@@ -1340,6 +1395,15 @@ function Timetable({
                       aria-label={item.completed ? "Mark task incomplete" : "Mark task complete"}
                     >
                       {item.completed && <Check size={13} />}
+                    </button>
+
+                    <button
+                      className="block-edit"
+                      onClick={() => editBlock(item)}
+                      title="Edit study block"
+                      aria-label="Edit study block"
+                    >
+                      <Pencil size={13} />
                     </button>
 
                     <button
@@ -1470,6 +1534,26 @@ function Syllabus({
                   onChange={(event) => mutateSubjectProgress(name, Number(event.target.value))}
                   aria-label={`${name} progress`}
                 />
+                <div className="subject-checklist" aria-label={`${name} checklist`}>
+                  {[
+                    ["module_completed", "Complete module"],
+                    ["lectures_completed", "Lectures"],
+                    ["pyq_completed", "Next PYQ"],
+                    ["races_completed", "Next races"],
+                    ["reference_book_completed", "Reference book"],
+                  ].map(([field, label]) => (
+                    <label key={field}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(items[0][field])}
+                        onChange={(event) => mutate("syllabus", items[0].id, {
+                          [field]: event.target.checked,
+                        })}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
               </div>
             );
           })}
@@ -1772,6 +1856,9 @@ function Archives({ items }) {
 function Modal({
   type,
   add,
+  editItem,
+  update,
+  startFocus,
   close,
 }) {
   const configs = {
@@ -1822,22 +1909,49 @@ function Modal({
         "concept",
       ],
     ],
+
+    focus: [
+      "Start focus mode",
+      "focus",
+      ["duration"],
+    ],
   };
 
   const [heading, collection, fields] =
     configs[type];
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
 
     const form = new FormData(
       event.currentTarget
     );
 
-    const payload =
-      Object.fromEntries(form);
+    const payload = Object.fromEntries(form);
 
-    add(collection, payload);
+    ["start", "end"].forEach((field) => {
+      const hour = Number(payload[`${field}_hour`]);
+      const minute = payload[`${field}_minute`];
+      const period = payload[`${field}_period`];
+
+      if (hour && minute !== "" && period) {
+        const hour24 = (hour % 12) + (period === "PM" ? 12 : 0);
+        payload[field] = `${String(hour24).padStart(2, "0")}:${minute}`;
+      }
+
+      delete payload[`${field}_hour`];
+      delete payload[`${field}_minute`];
+      delete payload[`${field}_period`];
+    });
+
+    if (type === "focus") {
+      startFocus(Number(payload.duration));
+    } else if (editItem) {
+      await update(collection, editItem.id, payload);
+      close();
+    } else {
+      add(collection, payload);
+    }
   };
 
   return (
@@ -1905,6 +2019,7 @@ function Modal({
 
                 <textarea
                   name={field}
+                  defaultValue={editItem?.[field] || ""}
                 />
 
               </label>
@@ -1927,6 +2042,7 @@ function Modal({
                 <select
                   name="day"
                   required
+                  defaultValue={editItem?.day || ""}
                 >
                   <option value="">
                     Select a day
@@ -1973,11 +2089,11 @@ function Modal({
             field === "end"
           ) {
             return (
-              <Field
+              <TimeField
                 key={field}
                 name={field}
                 label={label}
-                type="time"
+                value={editItem?.[field] || ""}
               />
             );
           }
@@ -1992,11 +2108,16 @@ function Modal({
               type={
                 field === "date"
                   ? "date"
+                  : field === "duration"
+                    ? "number"
                   : "text"
               }
+              min={field === "duration" ? "1" : undefined}
+              defaultValue={editItem?.[field] || (field === "duration" ? "25" : "")}
               required={
                 field === "title" ||
-                field === "date"
+                field === "date" ||
+                field === "duration"
               }
             />
           );
@@ -2006,7 +2127,7 @@ function Modal({
           className="primary full"
           type="submit"
         >
-          Save to tracker
+          {type === "focus" ? "Start focus session" : editItem ? "Save changes" : "Save to tracker"}
 
           <Check size={16} />
         </button>

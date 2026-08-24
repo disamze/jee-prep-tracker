@@ -123,6 +123,11 @@ class Item(BaseModel):
     kind: str = ""
 
     progress: int = Field(default=0, ge=0, le=100)
+    module_completed: bool = False
+    lectures_completed: bool = False
+    pyq_completed: bool = False
+    races_completed: bool = False
+    reference_book_completed: bool = False
 
     completed: bool = False
     archived: bool = False

@@ -666,6 +666,15 @@ button {
   color: #697791;
 }
 
+.block-edit {
+  position: absolute;
+  right: 6px;
+  top: 31px;
+  background: none;
+  border: 0;
+  color: #8e9cff;
+}
+
 .block-check {
   position: absolute;
   right: 6px;
@@ -738,6 +747,24 @@ button {
   accent-color: var(--green);
   cursor: pointer;
   width: 100%;
+}
+
+.subject-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-top: 11px;
+}
+
+.subject-checklist label {
+  color: #b9c5d8;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.subject-checklist input {
+  accent-color: var(--green);
+  margin: 0 5px 0 0;
 }
 
 .topic {
@@ -927,7 +954,8 @@ button {
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   padding: 10px 11px;
   background: #0c1421;
@@ -936,6 +964,44 @@ button {
   border-radius: 5px;
   font: 12px inherit;
   outline: none;
+}
+
+.time-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 7px;
+}
+
+.focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(circle at center, #202d65, #050812 62%);
+}
+
+.focus-overlay > span {
+  color: #aeb8ff;
+  font: 600 11px 'JetBrains Mono';
+  letter-spacing: 2px;
+}
+
+.focus-overlay strong {
+  font: 600 clamp(72px, 17vw, 170px) Outfit;
+  line-height: 1;
+  margin: 18px 0;
+}
+
+.focus-overlay p {
+  max-width: 360px;
+  color: #b5c0d3;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 26px;
 }
 
 .field input:focus,
