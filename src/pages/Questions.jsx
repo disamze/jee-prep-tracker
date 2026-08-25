@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Trophy } from "lucide-react";
 import { toast } from "sonner";
-import { crud, fmtMinutes, today } from "./lib/api";
-import { Card, Btn, Modal, Input, Select, Empty, PageHead, SUBJECTS, SUBJECT_COLORS } from "./components/bits";
+import { crud, fmtMinutes, today } from "../lib/api";
+import { Card, Btn, Modal, Input, Select, Empty, PageHead, SUBJECTS, SUBJECT_COLORS } from "../components/bits";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const practiceApi = crud("practice");

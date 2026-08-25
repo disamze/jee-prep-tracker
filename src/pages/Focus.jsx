@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Square, Volume2, VolumeX, Timer as TimerIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { crud, fmtMinutes, today } from "./lib/api";
-import { Card, Btn, Modal, Input, Select, Empty, PageHead, SUBJECTS, SUBJECT_COLORS } from "./components/bits";
+import { crud, fmtMinutes, today } from "../lib/api";
+import { Card, Btn, Modal, Input, Select, Empty, PageHead, SUBJECTS, SUBJECT_COLORS } from "../components/bits";
 
 const focusApi = crud("focus");
 const MODES = {

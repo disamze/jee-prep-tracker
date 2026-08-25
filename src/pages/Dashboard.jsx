@@ -4,8 +4,8 @@ import {
   Flame, Target, BookX, Timer, TrendingUp, Plus, ArrowRight,
   AlertTriangle, Info, CalendarDays, Repeat,
 } from "lucide-react";
-import { api, fmtMinutes } from "./lib/api";
-import { Card, StatCard, Ring, Empty, Btn } from "./components/bits";
+import { api, fmtMinutes } from "../lib/api";
+import { Card, StatCard, Ring, Empty, Btn } from "../components/bits";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const MISSION_ICONS = { revision: Repeat, error: BookX, task: CalendarDays, chapter: TrendingUp };

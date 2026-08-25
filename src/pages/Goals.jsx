@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, PlusCircle, MinusCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { crud } from "./lib/api";
-import { Card, Btn, Modal, Input, Select, Empty, PageHead, ProgressBar } from "./components/bits";
+import { crud } from "../lib/api";
+import { Card, Btn, Modal, Input, Select, Empty, PageHead, ProgressBar } from "../components/bits";
 
 const goalsApi = crud("goals");
 const BLANK = { title: "", type: "daily", target: 1, current: 0, unit: "", deadline: "", done: false };

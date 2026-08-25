@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { crud, api, today } from "./lib/api";
-import { Card, Btn, Modal, Input, Select, Empty, PageHead, SUBJECTS, SUBJECT_COLORS } from "./components/bits";
+import { crud, api, today } from "../lib/api";
+import { Card, Btn, Modal, Input, Select, Empty, PageHead, SUBJECTS, SUBJECT_COLORS } from "../components/bits";
 
 const revApi = crud("revisions");
 const BLANK = { subject: "Physics", chapter: "", topic: "", stage: 0, last_revised: "", next_due: today() };

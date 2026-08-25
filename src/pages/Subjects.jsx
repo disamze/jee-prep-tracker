@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { crud } from "./lib/api";
+import { crud } from "../lib/api";
 import {
   Card, Btn, Modal, Input, Select, Badge, Empty, PageHead, ProgressBar,
   SUBJECTS, SUBJECT_COLORS, CONFIDENCE,
-} from "./components/bits";
+} from "../components/bits";
 
 const chaptersApi = crud("chapters");
 const BLANK = {

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Check, Minus, X as XIcon, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { crud, fmtMinutes, today } from "./lib/api";
-import { Card, Btn, Modal, Input, Select, Empty, PageHead, SUBJECTS, SUBJECT_COLORS, PRIORITY_COLORS } from "./components/bits";
+import { crud, fmtMinutes, today } from "../lib/api";
+import { Card, Btn, Modal, Input, Select, Empty, PageHead, SUBJECTS, SUBJECT_COLORS, PRIORITY_COLORS } from "../components/bits";
 
 const tasksApi = crud("tasks");
 const BLANK = { date: today(), title: "", subject: "", chapter: "", start: "", end: "", duration: 60, priority: "medium", status: "pending" };

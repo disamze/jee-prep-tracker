@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Flame, Trophy, Clock, Target } from "lucide-react";
-import { api, fmtMinutes } from "./lib/api";
-import { Card, PageHead, Empty, SUBJECT_COLORS } from "./components/bits";
+import { api, fmtMinutes } from "../lib/api";
+import { Card, PageHead, Empty, SUBJECT_COLORS } from "../components/bits";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,

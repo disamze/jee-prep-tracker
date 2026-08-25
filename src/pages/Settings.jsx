@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Upload, Trash2, Save } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "./lib/api";
-import { Card, Btn, Input, PageHead, Modal } from "./components/bits";
+import { api } from "../lib/api";
+import { Card, Btn, Input, PageHead, Modal } from "../components/bits";
 
 const COL_LABELS = {
   errors: "Error Book", chapters: "Chapters", tasks: "Tasks",
